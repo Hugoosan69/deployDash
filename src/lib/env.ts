@@ -43,6 +43,12 @@ const ENV_VARS: EnvVar[] = [
     hint: "Segredo exigido por /api/cron/check-status. Sem ele o cron fica desligado.",
   },
   {
+    name: "LICENSE_SIGNING_PRIVATE_KEY",
+    scope: "server",
+    required: false,
+    hint: "Ed25519 (pkcs8 base64) que assina a resposta de /api/license/verify. Sem ela o endpoint de licenca responde 503.",
+  },
+  {
     name: "RESEND_API_KEY",
     scope: "server",
     required: false,
