@@ -110,7 +110,11 @@ export function ProjectForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      autoComplete="off"
+      className="space-y-6"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Identificacao</CardTitle>
@@ -241,6 +245,7 @@ export function ProjectForm({
             <Input
               id="supabase_anon_key"
               type="password"
+              autoComplete="new-password"
               placeholder={
                 project?.has_supabase_anon_key
                   ? "guardada — preencha so para substituir"
@@ -265,6 +270,7 @@ export function ProjectForm({
             <Input
               id="database_url"
               type="password"
+              autoComplete="new-password"
               placeholder={
                 project?.has_database_url
                   ? "guardada — preencha so para substituir"

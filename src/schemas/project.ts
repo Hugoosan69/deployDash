@@ -90,7 +90,16 @@ export type ProjectValues = z.output<typeof projectSchema>;
 
 export const vercelAccountSchema = z.object({
   label: z.string().trim().min(2).max(120),
-  team_id: optionalText,
+  // O autofill do navegador ja tentou mandar e-mail nesse campo; o servidor exige
+  // o formato real do Team ID em vez de confiar no pattern do input.
+  team_id: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || /^team_[A-Za-z0-9]+$/.test(value), {
+      message: 'Team ID comeca com "team_". Deixe vazio se for conta pessoal.',
+    })
+    .transform((value) => (value ? value : null)),
   token: z.string().trim().min(10, "Token invalido"),
 });
 
