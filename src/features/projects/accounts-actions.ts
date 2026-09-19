@@ -6,7 +6,9 @@ import { supabaseAccountSchema, vercelAccountSchema } from "@/schemas/project";
 import {
   createSupabaseAccount,
   createVercelAccount,
+  setAccountActive,
 } from "@/features/projects/projects.service";
+import type { AccountKind } from "@/features/projects/types";
 import { getVercelUser } from "@/lib/integrations/vercel";
 
 export type AccountState = { ok: boolean; error: string | null; info?: string };
@@ -74,4 +76,23 @@ export async function createSupabaseAccountAction(
 
   revalidatePath("/dashboard/accounts");
   return { ok: true, error: null };
+}
+
+export async function setAccountActiveAction(
+  kind: AccountKind,
+  id: string,
+  isActive: boolean,
+): Promise<AccountState> {
+  try {
+    await setAccountActive(kind, id, isActive);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao atualizar a conta",
+    };
+  }
+
+  revalidatePath("/dashboard/accounts");
+  revalidatePath("/dashboard");
+  return { ok: true, error: null, info: isActive ? "Conta ativada" : "Conta desativada" };
 }

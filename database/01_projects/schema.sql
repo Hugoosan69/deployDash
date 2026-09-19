@@ -2,23 +2,33 @@
 -- Todo campo *_encrypted guarda AES-256-GCM (v1:iv:tag:ciphertext) produzido em src/lib/crypto.ts.
 -- Nenhum segredo entra aqui em texto claro, e nenhum deles volta em listagem.
 
+-- Conta desativada sai do cadastro de projeto e do monitoramento, sem apagar o
+-- vinculo dos projetos que ja apontam para ela.
 create table if not exists vercel_accounts (
   id               uuid primary key default gen_random_uuid(),
   label            text not null unique,
   team_id          text,
   token_encrypted  text not null,
+  is_active        boolean not null default true,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
+
+alter table vercel_accounts
+  add column if not exists is_active boolean not null default true;
 
 -- O token de management do Supabase (sbp_...) e por conta, nao por projeto.
 create table if not exists supabase_accounts (
   id                          uuid primary key default gen_random_uuid(),
   label                       text not null unique,
   management_token_encrypted  text,
+  is_active                   boolean not null default true,
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now()
 );
+
+alter table supabase_accounts
+  add column if not exists is_active boolean not null default true;
 
 create table if not exists projects (
   id           uuid primary key default gen_random_uuid(),

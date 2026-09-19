@@ -6,7 +6,7 @@ import { recordAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth";
 import type { ProjectValues, RevealableField } from "@/schemas/project";
 
-import type { AccountSummary, ProjectSummary } from "./types";
+import type { AccountKind, AccountSummary, ProjectSummary } from "./types";
 
 /**
  * Regra de negocio e autorizacao dos projetos. A UI nunca fala com o banco em
@@ -220,37 +220,104 @@ export async function revealProjectSecret(
   return decryptSecret(encrypted);
 }
 
+/** Quantos projetos apontam para cada conta, para avisar antes de desativar. */
+async function countProjectsByAccount(
+  column: "vercel_account_id" | "supabase_account_id",
+): Promise<Record<string, number>> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("projects").select(column);
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const accountId = (row as Record<string, string | null>)[column];
+    if (!accountId) continue;
+    counts[accountId] = (counts[accountId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function listVercelAccounts(): Promise<AccountSummary[]> {
   await requireUser();
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("vercel_accounts")
-    .select("id, label, team_id, token_encrypted")
-    .order("label");
+  const [{ data, error }, counts] = await Promise.all([
+    admin
+      .from("vercel_accounts")
+      .select("id, label, team_id, token_encrypted, is_active, created_at")
+      .order("is_active", { ascending: false })
+      .order("label"),
+    countProjectsByAccount("vercel_account_id"),
+  ]);
 
   if (error) throw new Error(`Falha ao listar contas Vercel: ${error.message}`);
   return (data ?? []).map((row) => ({
     id: row.id as string,
+    kind: "vercel" as const,
     label: row.label as string,
     team_id: row.team_id as string | null,
     has_token: Boolean(row.token_encrypted),
+    is_active: row.is_active as boolean,
+    created_at: row.created_at as string,
+    project_count: counts[row.id as string] ?? 0,
   }));
 }
 
 export async function listSupabaseAccounts(): Promise<AccountSummary[]> {
   await requireUser();
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("supabase_accounts")
-    .select("id, label, management_token_encrypted")
-    .order("label");
+  const [{ data, error }, counts] = await Promise.all([
+    admin
+      .from("supabase_accounts")
+      .select("id, label, management_token_encrypted, is_active, created_at")
+      .order("is_active", { ascending: false })
+      .order("label"),
+    countProjectsByAccount("supabase_account_id"),
+  ]);
 
   if (error) throw new Error(`Falha ao listar contas Supabase: ${error.message}`);
   return (data ?? []).map((row) => ({
     id: row.id as string,
+    kind: "supabase" as const,
     label: row.label as string,
     has_token: Boolean(row.management_token_encrypted),
+    is_active: row.is_active as boolean,
+    created_at: row.created_at as string,
+    project_count: counts[row.id as string] ?? 0,
   }));
+}
+
+const ACCOUNT_TABLE: Record<AccountKind, string> = {
+  vercel: "vercel_accounts",
+  supabase: "supabase_accounts",
+};
+
+/**
+ * Liga/desliga uma conta. Desativar nao apaga nada: o token continua cifrado no
+ * banco e os projetos mantem o vinculo — a conta so para de ser oferecida em
+ * cadastro novo e de ser consultada pelo monitoramento.
+ */
+export async function setAccountActive(
+  kind: AccountKind,
+  id: string,
+  isActive: boolean,
+): Promise<void> {
+  const user = await requireUser();
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from(ACCOUNT_TABLE[kind])
+    .update({ is_active: isActive })
+    .eq("id", id)
+    .select("label")
+    .maybeSingle();
+
+  if (error) throw new Error(`Falha ao atualizar a conta: ${error.message}`);
+  if (!data) throw new Error("Conta nao encontrada");
+
+  await recordAudit({
+    actorEmail: user.email,
+    action: isActive ? "account.activate" : "account.deactivate",
+    target: `${kind}:${data.label as string}`,
+  });
 }
 
 export async function createVercelAccount(values: {

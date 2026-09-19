@@ -138,11 +138,13 @@ async function loadVercelCredentials(accountId: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("vercel_accounts")
-    .select("token_encrypted, team_id")
+    .select("token_encrypted, team_id, is_active")
     .eq("id", accountId)
     .maybeSingle();
 
-  if (!data?.token_encrypted) return null;
+  // Conta desativada sai do monitoramento: o projeto continua sendo checado por
+  // HTTP, mas nao gastamos chamada com um token que o usuario aposentou.
+  if (!data?.token_encrypted || data.is_active === false) return null;
   return {
     token: decryptSecret(data.token_encrypted),
     teamId: (data.team_id as string | null) ?? null,

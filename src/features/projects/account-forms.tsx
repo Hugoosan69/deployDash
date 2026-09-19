@@ -37,22 +37,30 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-function useToast(state: AccountState, successMessage: string) {
+function useToast(
+  state: AccountState,
+  successMessage: string,
+  onDone?: () => void,
+) {
   useEffect(() => {
-    if (state.ok) toast.success(state.info ?? successMessage);
-    else if (state.error) toast.error(state.error);
-  }, [state, successMessage]);
+    if (state.ok) {
+      toast.success(state.info ?? successMessage);
+      onDone?.();
+    } else if (state.error) {
+      toast.error(state.error);
+    }
+  }, [state, successMessage, onDone]);
 }
 
-export function VercelAccountForm() {
+export function VercelAccountForm({ onDone }: { onDone?: () => void }) {
   const [state, formAction] = useActionState(createVercelAccountAction, EMPTY);
-  useToast(state, "Conta Vercel salva");
+  useToast(state, "Conta Vercel salva", onDone);
 
   return (
     <form
       action={formAction}
       autoComplete="off"
-      className="grid gap-3 sm:grid-cols-3"
+      className="grid gap-3"
     >
       <div className="space-y-1.5">
         <Label htmlFor="vercel-label">Apelido da conta</Label>
@@ -87,28 +95,28 @@ export function VercelAccountForm() {
           vercel.com/account/tokens. E validado antes de salvar.
         </Hint>
       </div>
-      <div className="sm:col-span-3">
+      <div className="pt-1">
         <Submit label="Adicionar conta Vercel" />
       </div>
     </form>
   );
 }
 
-export function SupabaseAccountForm() {
+export function SupabaseAccountForm({ onDone }: { onDone?: () => void }) {
   const [state, formAction] = useActionState(createSupabaseAccountAction, EMPTY);
-  useToast(state, "Conta Supabase salva");
+  useToast(state, "Conta Supabase salva", onDone);
 
   return (
     <form
       action={formAction}
       autoComplete="off"
-      className="grid gap-3 sm:grid-cols-3"
+      className="grid gap-3"
     >
       <div className="space-y-1.5">
         <Label htmlFor="supabase-label">Apelido da conta</Label>
         <Input id="supabase-label" name="label" required {...NO_AUTOFILL} />
       </div>
-      <div className="space-y-1.5 sm:col-span-2">
+      <div className="space-y-1.5">
         <Label htmlFor="supabase-token">Token de management (sbp_...)</Label>
         <Input
           id="supabase-token"
@@ -123,7 +131,7 @@ export function SupabaseAccountForm() {
           monitorado por HTTP e pela Vercel.
         </Hint>
       </div>
-      <div className="sm:col-span-3">
+      <div className="pt-1">
         <Submit label="Adicionar conta Supabase" />
       </div>
     </form>

@@ -27,9 +27,16 @@ export type ProjectSummary = {
   has_database_url: boolean;
 };
 
+export type AccountKind = "vercel" | "supabase";
+
 export type AccountSummary = {
   id: string;
+  kind: AccountKind;
   label: string;
   team_id?: string | null;
   has_token: boolean;
+  is_active: boolean;
+  created_at: string;
+  /** Quantos projetos apontam para esta conta. */
+  project_count: number;
 };

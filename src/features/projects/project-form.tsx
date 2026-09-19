@@ -48,6 +48,15 @@ export function ProjectForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const isEdit = Boolean(project);
 
+  // Conta desativada some da lista, mas continua visivel quando o projeto ja
+  // aponta para ela: escondê-la faria a edicao trocar o vinculo em silencio.
+  const selectableVercel = vercelAccounts.filter(
+    (account) => account.is_active || account.id === project?.vercel_account_id,
+  );
+  const selectableSupabase = supabaseAccounts.filter(
+    (account) => account.is_active || account.id === project?.supabase_account_id,
+  );
+
   const {
     register,
     handleSubmit,
@@ -187,13 +196,20 @@ export function ProjectForm({
             <Label htmlFor="vercel_account_id">Conta</Label>
             <Select id="vercel_account_id" {...register("vercel_account_id")}>
               <option value="">— nenhuma —</option>
-              {vercelAccounts.map((account) => (
+              {selectableVercel.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.label}
+                  {account.is_active ? "" : " (inativa)"}
                 </option>
               ))}
             </Select>
             <FieldError message={errors.vercel_account_id?.message} />
+            {selectableVercel.length === 0 ? (
+              <p className="text-xs text-amber-300/80">
+                Nenhuma conta Vercel ativa. Cadastre uma em Contas para ler o
+                estado dos deployments.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
@@ -217,9 +233,10 @@ export function ProjectForm({
             <Label htmlFor="supabase_account_id">Conta</Label>
             <Select id="supabase_account_id" {...register("supabase_account_id")}>
               <option value="">— nenhuma —</option>
-              {supabaseAccounts.map((account) => (
+              {selectableSupabase.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.label}
+                  {account.is_active ? "" : " (inativa)"}
                 </option>
               ))}
             </Select>
