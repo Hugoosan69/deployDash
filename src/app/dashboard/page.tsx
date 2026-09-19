@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { listProjects } from "@/features/projects/projects.service";
+import { getRecentChecksByProject } from "@/features/monitoring/monitoring.service";
 import { ProjectCard } from "@/features/projects/project-card";
 import { getLicenseInfo } from "@/features/licenses/license-info";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const projects = await listProjects();
+  // Uma consulta para todos os cards, em vez de uma por projeto.
+  const checksByProject = await getRecentChecksByProject(
+    projects.map((project) => project.id),
+  );
 
   const online = projects.filter((project) => project.status === "online").length;
   const down = projects.filter(
@@ -52,7 +57,11 @@ export default async function DashboardPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              checks={checksByProject[project.id] ?? []}
+            />
           ))}
         </div>
       )}

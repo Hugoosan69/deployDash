@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 
 import { getProject } from "@/features/projects/projects.service";
-import { getStatusHistory } from "@/features/monitoring/monitoring.service";
+import {
+  getRecentChecksByProject,
+  getStatusHistory,
+} from "@/features/monitoring/monitoring.service";
+import { UptimeStrip } from "@/features/monitoring/uptime-strip";
+import { summarizeUptime, formatCheckedAt } from "@/features/monitoring/uptime";
 import { StatusBadge } from "@/features/monitoring/status-badge";
 import { LicenseBadge } from "@/features/licenses/license-badge";
 import { SecretReveal } from "@/features/projects/secret-reveal";
@@ -27,6 +32,15 @@ function Field({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dd className="mt-0.5 text-lg font-semibold text-zinc-100">{value}</dd>
+    </div>
+  );
+}
+
 export default async function ProjectDetailPage({
   params,
 }: PageProps<"/dashboard/projects/[id]">) {
@@ -34,7 +48,14 @@ export default async function ProjectDetailPage({
   const project = await getProject(id);
   if (!project) notFound();
 
-  const history = await getStatusHistory(project.id, 20);
+  const [history, checksByProject] = await Promise.all([
+    getStatusHistory(project.id, 20),
+    getRecentChecksByProject([project.id], 40),
+  ]);
+
+  const checks = checksByProject[project.id] ?? [];
+  const day = summarizeUptime(checks, 24);
+  const week = summarizeUptime(checks, 24 * 7);
 
   return (
     <div className="space-y-6">
@@ -128,6 +149,33 @@ export default async function ProjectDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Disponibilidade</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <UptimeStrip checks={checks} slots={40} className="h-8" />
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Metric
+              label="Ultimas 24h"
+              value={day.availability === null ? "—" : `${day.availability}%`}
+            />
+            <Metric
+              label="Ultimos 7 dias"
+              value={week.availability === null ? "—" : `${week.availability}%`}
+            />
+            <Metric
+              label="Resposta media"
+              value={day.avgResponseMs === null ? "—" : `${day.avgResponseMs} ms`}
+            />
+            <Metric
+              label="Ultima verificacao"
+              value={formatCheckedAt(project.last_status_check)}
+            />
+          </dl>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -5,6 +5,7 @@ import { decryptSecret } from "@/lib/crypto";
 import { checkHttp } from "@/lib/integrations/http-check";
 import { getVercelProjectStatus } from "@/lib/integrations/vercel";
 import type { ProjectStatus } from "@/features/projects/types";
+import type { UptimeCheck } from "./uptime";
 
 /**
  * Verificacao de status. Duas fontes independentes por projeto:
@@ -216,4 +217,55 @@ export async function getStatusHistory(
 
   if (error) throw new Error(`Falha ao carregar historico: ${error.message}`);
   return (data ?? []) as StatusLog[];
+}
+
+/**
+ * Ultimas verificacoes de varios projetos em uma consulta so, para o dashboard
+ * nao fazer uma query por card.
+ *
+ * Cada ciclo grava ate duas linhas (http e vercel). Misturar as duas na faixa
+ * daria dois tracos por verificacao, entao cada projeto mostra so a fonte que
+ * responde melhor a pergunta "esta no ar?": http quando existe, vercel senao.
+ */
+export async function getRecentChecksByProject(
+  projectIds: string[],
+  perProject = 24,
+): Promise<Record<string, UptimeCheck[]>> {
+  if (projectIds.length === 0) return {};
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("project_status_logs")
+    .select("project_id, source, status, response_time_ms, error_message, created_at")
+    .in("project_id", projectIds)
+    .order("created_at", { ascending: false })
+    .limit(projectIds.length * perProject * 2);
+
+  if (error) throw new Error(`Falha ao carregar verificacoes: ${error.message}`);
+
+  const porProjeto: Record<string, { http: UptimeCheck[]; vercel: UptimeCheck[] }> =
+    {};
+
+  for (const row of data ?? []) {
+    const projectId = row.project_id as string;
+    const source = row.source as "http" | "vercel";
+    porProjeto[projectId] ??= { http: [], vercel: [] };
+
+    const bucket = porProjeto[projectId][source];
+    if (bucket.length >= perProject) continue;
+
+    bucket.push({
+      status: row.status as UptimeCheck["status"],
+      response_time_ms: row.response_time_ms as number | null,
+      error_message: row.error_message as string | null,
+      created_at: row.created_at as string,
+    });
+  }
+
+  return Object.fromEntries(
+    Object.entries(porProjeto).map(([projectId, fontes]) => [
+      projectId,
+      fontes.http.length > 0 ? fontes.http : fontes.vercel,
+    ]),
+  );
 }

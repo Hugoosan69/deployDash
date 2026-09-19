@@ -8,24 +8,26 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/primitives";
 import { StatusBadge } from "@/features/monitoring/status-badge";
+import { UptimeStrip } from "@/features/monitoring/uptime-strip";
+import {
+  formatCheckedAt,
+  summarizeUptime,
+  type UptimeCheck,
+} from "@/features/monitoring/uptime";
 import { LicenseBadge } from "@/features/licenses/license-badge";
 
 import { refreshProjectStatusAction } from "./actions";
 import type { ProjectSummary } from "./types";
 
-function formatCheckedAt(value: string | null): string {
-  if (!value) return "nunca verificado";
-  const date = new Date(value);
-  const minutes = Math.round((Date.now() - date.getTime()) / 60000);
-  if (minutes < 1) return "agora mesmo";
-  if (minutes < 60) return `ha ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `ha ${hours}h`;
-  return date.toLocaleDateString("pt-BR");
-}
-
-export function ProjectCard({ project }: { project: ProjectSummary }) {
+export function ProjectCard({
+  project,
+  checks = [],
+}: {
+  project: ProjectSummary;
+  checks?: UptimeCheck[];
+}) {
   const [pending, startTransition] = useTransition();
+  const uptime = summarizeUptime(checks, 24);
 
   function refresh() {
     startTransition(async () => {
@@ -36,8 +38,14 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
   }
 
   return (
-    <Card className={project.is_active ? undefined : "opacity-60"}>
-      <CardContent className="space-y-3 pt-5">
+    <Card
+      className={
+        project.is_active
+          ? "transition-colors hover:border-zinc-700"
+          : "opacity-60 transition-colors hover:border-zinc-700"
+      }
+    >
+      <CardContent className="space-y-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Link
@@ -57,6 +65,22 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           </p>
         ) : null}
 
+        <div>
+          <UptimeStrip checks={checks} slots={24} />
+          <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-500">
+            <span>
+              {uptime.availability === null
+                ? "sem verificacao nas ultimas 24h"
+                : `${uptime.availability}% em 24h`}
+            </span>
+            <span>
+              {uptime.avgResponseMs === null
+                ? formatCheckedAt(project.last_status_check)
+                : `${uptime.avgResponseMs} ms`}
+            </span>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <LicenseBadge expiresAt={project.license_expires_at} />
           {project.is_active ? null : (
@@ -65,10 +89,6 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             </span>
           )}
         </div>
-
-        <p className="text-xs text-zinc-500">
-          Verificado {formatCheckedAt(project.last_status_check)}
-        </p>
       </CardContent>
 
       <CardFooter>
@@ -79,7 +99,9 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           disabled={pending}
           aria-label={`Verificar status de ${project.name}`}
         >
-          <RefreshCw className={pending ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+          <RefreshCw
+            className={pending ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+          />
           Verificar
         </Button>
 
